@@ -153,7 +153,7 @@ pub async fn execute(args: Args) -> miette::Result<()> {
         args.platforms.clone()
     };
 
-    // Create a 'pixi.toml' manifest and populate it by importing a conda environment file
+    // Create a 'pixi.toml' manifest and populate it by importing a conda environment file or a requirements.txt file
     if let Some(env_file_path) = args.env_file {
         // Check if the 'pixi.toml' file doesn't already exist. We don't want to overwrite it.
         if pixi_manifest_path.is_file() {
