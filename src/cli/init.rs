@@ -159,51 +159,56 @@ pub async fn execute(args: Args) -> miette::Result<()> {
         if pixi_manifest_path.is_file() {
             miette::bail!("{} already exists", consts::PROJECT_MANIFEST);
         }
+        if env_file_path.ends_with("requirements.txt") {
+          // pip requirements.txt file
+          // TODO: implement this
+        } else if env_file_path.ends_with("environment.yml") || env_file_path.ends_with("environment.yaml") {
+          // conda environment file
+          let env_file = CondaEnvFile::from_path(&env_file_path)?;
+          let name = env_file.name().unwrap_or(default_name.as_str()).to_string();
 
-        let env_file = CondaEnvFile::from_path(&env_file_path)?;
-        let name = env_file.name().unwrap_or(default_name.as_str()).to_string();
+          // TODO: Improve this:
+          //  - Use .condarc as channel config
+          //  - Implement it for `[crate::project::manifest::ProjectManifest]` to do this for other filetypes, e.g. (pyproject.toml, requirements.txt)
+          let (conda_deps, pypi_deps, channels) = env_file.to_manifest(&config)?;
+          let rv = render_project(
+              &env,
+              name,
+              version,
+              author.as_ref(),
+              channels,
+              &platforms,
+              None,
+              &vec![],
+          );
+          let mut project = Project::from_str(&pixi_manifest_path, &rv)?;
+          let platforms = platforms
+              .into_iter()
+              .map(|p| p.parse().into_diagnostic())
+              .collect::<Result<Vec<Platform>, _>>()?;
+          for spec in conda_deps {
+              // TODO: fix serialization of channels in rattler_conda_types::MatchSpec
+              project.manifest.add_dependency(
+                  &spec,
+                  crate::SpecType::Run,
+                  &platforms,
+                  &FeatureName::default(),
+                  DependencyOverwriteBehavior::Overwrite,
+              )?;
+          }
+          for requirement in pypi_deps {
+              project.manifest.add_pypi_dependency(
+                  &requirement,
+                  &platforms,
+                  &FeatureName::default(),
+                  None,
+                  DependencyOverwriteBehavior::Overwrite,
+              )?;
+          }
+          project.save()?;
 
-        // TODO: Improve this:
-        //  - Use .condarc as channel config
-        //  - Implement it for `[crate::project::manifest::ProjectManifest]` to do this for other filetypes, e.g. (pyproject.toml, requirements.txt)
-        let (conda_deps, pypi_deps, channels) = env_file.to_manifest(&config)?;
-        let rv = render_project(
-            &env,
-            name,
-            version,
-            author.as_ref(),
-            channels,
-            &platforms,
-            None,
-            &vec![],
-        );
-        let mut project = Project::from_str(&pixi_manifest_path, &rv)?;
-        let platforms = platforms
-            .into_iter()
-            .map(|p| p.parse().into_diagnostic())
-            .collect::<Result<Vec<Platform>, _>>()?;
-        for spec in conda_deps {
-            // TODO: fix serialization of channels in rattler_conda_types::MatchSpec
-            project.manifest.add_dependency(
-                &spec,
-                crate::SpecType::Run,
-                &platforms,
-                &FeatureName::default(),
-                DependencyOverwriteBehavior::Overwrite,
-            )?;
+          get_up_to_date_prefix(&project.default_environment(), LockFileUsage::Update, false).await?;
         }
-        for requirement in pypi_deps {
-            project.manifest.add_pypi_dependency(
-                &requirement,
-                &platforms,
-                &FeatureName::default(),
-                None,
-                DependencyOverwriteBehavior::Overwrite,
-            )?;
-        }
-        project.save()?;
-
-        get_up_to_date_prefix(&project.default_environment(), LockFileUsage::Update, false).await?;
     } else {
         let channels = if let Some(channels) = args.channels {
             channels
