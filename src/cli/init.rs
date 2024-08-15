@@ -3,6 +3,7 @@ use crate::environment::{get_up_to_date_prefix, LockFileUsage};
 use crate::project::manifest::pyproject::PyProjectToml;
 use crate::project::manifest::DependencyOverwriteBehavior;
 use crate::utils::conda_environment_file::CondaEnvFile;
+use crate::utils::pip_requirement_file::PipEnvFile;
 use crate::{config::get_default_author, consts};
 use crate::{FeatureName, Project};
 use clap::Parser;
@@ -162,6 +163,8 @@ pub async fn execute(args: Args) -> miette::Result<()> {
         if env_file_path.ends_with("requirements.txt") {
           // pip requirements.txt file
           // TODO: implement this
+          let env_file = PipEnvFile::from_path(&env_file_path)?;
+          
         } else if env_file_path.ends_with("environment.yml") || env_file_path.ends_with("environment.yaml") {
           // conda environment file
           let env_file = CondaEnvFile::from_path(&env_file_path)?;

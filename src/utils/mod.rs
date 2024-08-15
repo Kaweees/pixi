@@ -1,6 +1,7 @@
 mod barrier_cell;
 
 pub mod conda_environment_file;
+pub mod pip_requirement_file;
 mod prefix_guard;
 pub mod reqwest;
 pub mod spanned;
